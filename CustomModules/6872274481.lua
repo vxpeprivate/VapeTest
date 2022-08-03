@@ -126,7 +126,7 @@ local function GetURL(scripturl)
 	if shared.VapeDeveloper then
 		return readfile("vape/"..scripturl)
 	else
-		return game:HttpGet("https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/main/"..scripturl, true)
+		return game:HttpGet("https://raw.githubusercontent.com/vxpeprivate/VapeV4ForRoblox/main/"..scripturl, true)
 	end
 end
 local shalib = loadstring(GetURL("Libraries/sha.lua"))()
@@ -177,7 +177,7 @@ local whitelisted = {
 	}
 }
 pcall(function()
-	whitelisted = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://raw.githubusercontent.com/7GrandDadPGN/whitelists/main/whitelist2.json", true))
+	whitelisted = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://raw.githubusercontent.com/vxpeprivate/whitelists/main/whitelist2.json", true))
 end)
 local AnticheatBypassNumbers = {
 	TPSpeed = 0.1,
@@ -340,7 +340,7 @@ local function getcustomassetfunc(path)
 			textlabel:Remove()
 		end)
 		local req = requestfunc({
-			Url = "https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/main/"..path:gsub("vape/assets", "assets"),
+			Url = "https://raw.githubusercontent.com/vxpeprivate/VapeV4ForRoblox/main/"..path:gsub("vape/assets", "assets"),
 			Method = "GET"
 		})
 		writefile(path, req.Body)
@@ -1896,25 +1896,29 @@ bedwars["breakBlock"] = function(pos, effects, normal, bypass)
 				healthbarblocktable.breakingBlockPosition = blockhealthbarpos.blockPosition
 			end
             blockdmg = bedwars["BlockController"]:calculateBlockDamage(lplr, blockhealthbarpos)
+			healthbarblocktable.blockHealth = healthbarblocktable.blockHealth - blockdmg
+            if healthbarblocktable.blockHealth < 0 then
+                healthbarblocktable.blockHealth = 0
+            end
             bedwars["ClientHandlerDamageBlock"]:Get("DamageBlock"):CallServerAsync({
                 blockRef = blockhealthbarpos, 
                 hitPosition = blockpos * 3, 
                 hitNormal = Vector3.FromNormalId(normal)
             }):andThen(function(result)
-				if result ~= "failed" then
-					healthbarblocktable.blockHealth = math.max(healthbarblocktable.blockHealth - blockdmg, 0)
-					if effects then
-						bedwars["BlockBreaker"]:updateHealthbar(blockhealthbarpos, healthbarblocktable.blockHealth, block:GetAttribute("MaxHealth"), blockdmg)
-						if healthbarblocktable.blockHealth <= 0 then
-							bedwars["BlockBreaker"].breakEffect:playBreak(block.Name, blockhealthbarpos.blockPosition, lplr)
-							bedwars["BlockBreaker"].healthbarMaid:DoCleaning()
-							healthbarblocktable.breakingBlockPosition = Vector3.zero
-						else
-							bedwars["BlockBreaker"].breakEffect:playHit(block.Name, blockhealthbarpos.blockPosition, lplr)
-						end
-					end
+				if result == "failed" then
+					healthbarblocktable.blockHealth = healthbarblocktable.blockHealth + blockdmg
 				end
 			end)
+            if effects then
+				bedwars["BlockBreaker"]:updateHealthbar(blockhealthbarpos, healthbarblocktable.blockHealth, block:GetAttribute("MaxHealth"), blockdmg)
+                if healthbarblocktable.blockHealth <= 0 then
+                    bedwars["BlockBreaker"].breakEffect:playBreak(block.Name, blockhealthbarpos.blockPosition, lplr)
+                    bedwars["BlockBreaker"].healthbarMaid:DoCleaning()
+					healthbarblocktable.breakingBlockPosition = Vector3.zero
+                else
+                    bedwars["BlockBreaker"].breakEffect:playHit(block.Name, blockhealthbarpos.blockPosition, lplr)
+                end
+            end
         end
     end
 end	
@@ -2949,6 +2953,37 @@ end)
 
 
 runcode(function()
+	local function roundpos(pos)
+		return Vector3.new(math.round(pos.X / 3) * 3, math.round(pos.Y / 3) * 3, math.round(pos.Z / 3) * 3)
+	end
+	
+	local TPAura = {["Enabled"] = false}
+	TPAura = GuiLibrary["ObjectsThatCanBeSaved"]["BlatantWindow"]["Api"].CreateOptionsButton({
+		["Name"] = "TPAura",
+		["Function"] = function(callback)
+			if callback then 
+				spawn(function()
+					repeat
+						task.wait(0.03)
+						local plr = GetNearestHumanoidToPosition(true, 1000)
+						if plr and (not bedwars["CheckWhitelisted"](plr.Player)) then
+							game:GetService("ReplicatedStorage"):FindFirstChild("events-@easy-games/game-core:shared/game-core-networking@getEvents.Events").useAbility:FireServer("void_turret_fire", {
+								target = plr.Character,
+								fromTurret = {
+									Name = "void_turret",
+									Position = roundpos(plr.Character.HumanoidRootPart.Position),
+									Parent = workspace.Map.Worlds:GetChildren()[1].Blocks
+								}
+							})
+							task.delay(1.8, function() bedwars["SwordController"]:playSwordEffect(bedwars["ItemTable"]["wood_sword"]) end)
+							task.wait(2.4)
+						end
+					until (not TPAura["Enabled"])
+				end)
+			end
+		end
+	})
+
 	local DinoExploit = {["Enabled"] = false}
 	local dinoconnection
 	DinoExploit = GuiLibrary["ObjectsThatCanBeSaved"]["BlatantWindow"]["Api"].CreateOptionsButton({
@@ -4873,7 +4908,7 @@ runcode(function()
 							task.spawn(function()
 								for i = 1, 100 do
 									task.wait(0.01)
-									entity.character.HumanoidRootPart.Velocity = vec3(0, i * 2.5, 0)
+									entity.character.HumanoidRootPart.Velocity = vec3(0, i * 3, 0)
 								end
 							end)
 						else
@@ -5141,13 +5176,13 @@ runcode(function()
 		end
 		local selfroot = (oldcloneroot or entity.character.HumanoidRootPart)
 		local selfrootpos = selfroot.Position
-		local selfcheck = selfrootpos - (selfroot.Velocity * 0.164)
+		local selfcheck = selfrootpos - (selfroot.Velocity * 0.163)
 		if (selfcheck - (root.Position + (root.Velocity * 0.05))).Magnitude > 18 then 
 			return nil
 		end
 		local selfpos = selfrootpos + (killaurarange["Value"] > 14 and (selfrootpos - root.Position).magnitude > 14 and (CFrame.lookAt(selfrootpos, root.Position).lookVector * 4) or Vector3.zero)
 		local ping = math.floor(tonumber(game:GetService("Stats"):FindFirstChild("PerformanceStats").Ping:GetValue()))
-		bedwars["SwordController"].lastAttack = tick() + (ping > 120 and -0.08 or 0) or 0
+		bedwars["SwordController"].lastAttack = tick() + (ping > 100 and 0 or 0.06)
 		local attacksuccess = killaurarealremote:InvokeServer({
 			["bye"] = "lex",
 			["weapon"] = sword["tool"],
@@ -5162,7 +5197,7 @@ runcode(function()
 				["selfPosition"] = hashvec(selfpos)
 			}
 		})
-		bedwars["SwordController"].lastAttack = attacksuccess and tick() + (ping > 120 and -0.08 or 0) or 0
+		bedwars["SwordController"].lastAttack = attacksuccess and tick() + (ping > 100 and 0 or 0.06) or 0
 	end
 
 	local orig
@@ -5177,8 +5212,8 @@ runcode(function()
 			{CFrame = cfnew(0.69, -0.71, 0.6) * CFrame.Angles(math.rad(200), math.rad(60), math.rad(1)), Time = 0.15}
 		},
 		New = {
-			{CFrame = CFrame.new(0.69, -0.77, 0.37 + 1.1) * CFrame.Angles(math.rad(-33), math.rad(57), math.rad(-81)), Time = 0.12},
-			{CFrame = CFrame.new(0.74, -0.92, -0.22 + 1.1) * CFrame.Angles(math.rad(147), math.rad(71), math.rad(53)), Time = 0.12}
+			{CFrame = CFrame.new(0.69, -0.77, 0.37) * CFrame.Angles(math.rad(-33), math.rad(57), math.rad(-81)), Time = 0.12},
+			{CFrame = CFrame.new(0.74, -0.92, -0.22) * CFrame.Angles(math.rad(147), math.rad(71), math.rad(53)), Time = 0.12}
 		},
 		["Vertical Spin"] = {
 			{CFrame = cfnew(0, 0, 0) * CFrame.Angles(math.rad(-90), math.rad(8), math.rad(5)), Time = 0.1},
@@ -6632,7 +6667,6 @@ runcode(function()
 	AutoToxicPhrases8["Object"].AddBoxBKG.AddBox.TextSize = 12
 end)
 
-local slowdowntick = tick()
 local Scaffold = {["Enabled"] = false}
 local flyvelo
 local flyboosting = false
@@ -6656,6 +6690,7 @@ runcode(function()
 	local boosttimes = 0
 	local raycastparameters = RaycastParams.new()
 	local funni = false
+	local slowdowntick = tick()
 	local speedcheck
 	local tweenservice = game:GetService("TweenService")
 
@@ -6686,7 +6721,7 @@ runcode(function()
 					end
 				end)
 				speedcheck = lplr:GetAttributeChangedSignal("LastTeleported"):connect(function()
-					if math.abs(lplr:GetAttribute("SpawnTime") - lplr:GetAttribute("LastTeleported")) > 1 and matchstatetick <= tick() and matchState ~= 0 then
+					if math.abs(lplr:GetAttribute("SpawnTime") - lplr:GetAttribute("LastTeleported")) > 1 and matchstatetick <= tick() and matchState ~= 0 and speedmode["Value"] == "Heatseeker" then
 						slowdowntick = tick() + 3
 						local warning = createwarning("Speed", "Teleport Detected\nSlowing down speed for 3s.", 3)
 						pcall(function()
@@ -6726,9 +6761,7 @@ runcode(function()
 							local ray = workspace:Raycast(entity.character.HumanoidRootPart.Position, newpos, raycastparameters)
 							if ray then newpos = (ray.Position - entity.character.HumanoidRootPart.Position) end
 							if networkownerfunc(entity.character.HumanoidRootPart) then
-								if slowdowntick <= tick() then
-									entity.character.HumanoidRootPart.CFrame = entity.character.HumanoidRootPart.CFrame + newpos
-								end
+								entity.character.HumanoidRootPart.CFrame = entity.character.HumanoidRootPart.CFrame + newpos
 								entity.character.HumanoidRootPart.Velocity = vec3(velocheck and movevec.X or 0, entity.character.HumanoidRootPart.Velocity.Y, velocheck and movevec.Z or 0)
 							end
 						elseif speedmode["Value"] == "Normal" then 
@@ -6738,8 +6771,7 @@ runcode(function()
 								bodyvelo.MaxForce = vec3(9e9, 0, 9e9)
 							else
 								bodyvelo.MaxForce = ((entity.character.Humanoid:GetState() == Enum.HumanoidStateType.Climbing or entity.character.Humanoid.Sit or spidergoinup or antivoiding or GuiLibrary["ObjectsThatCanBeSaved"]["FlyOptionsButton"]["Api"]["Enabled"] or uninjectflag) and Vector3.zero or (longjump["Enabled"] and vec3(9e9, 0, 9e9) or vec3(9e9, 0, 9e9)))
-								bodyvelo.Velocity = longjump["Enabled"] and longjumpvelo or entity.character.Humanoid.MoveDirection * ((GuiLibrary["ObjectsThatCanBeSaved"]["FlyOptionsButton"]["Api"]["Enabled"] and 0 or ((longjumpticktimer >= tick() or slowdowntick >= tick()) and allowedvelo) or speedval["Value"]) * 1) * getSpeedMultiplier(true) * (slowdownspeed and slowdownspeedval or 1) * (bedwars["RavenTable"]["spawningRaven"] and 0 or 1) * ((combatcheck or combatchecktick >= tick()) and AnticheatBypassCombatCheck["Enabled"] and (not longjump["Enabled"]) and (not GuiLibrary["ObjectsThatCanBeSaved"]["FlyOptionsButton"]["Api"]["Enabled"]) and 0.84 or 1)
-								print(bodyvelo.Velocity.Magnitude)
+								bodyvelo.Velocity = longjump["Enabled"] and longjumpvelo or entity.character.Humanoid.MoveDirection * ((GuiLibrary["ObjectsThatCanBeSaved"]["FlyOptionsButton"]["Api"]["Enabled"] and 0 or ((longjumpticktimer >= tick()) and 20) or speedval["Value"]) * 1) * getSpeedMultiplier(true) * (slowdownspeed and slowdownspeedval or 1) * (bedwars["RavenTable"]["spawningRaven"] and 0 or 1) * ((combatcheck or combatchecktick >= tick()) and AnticheatBypassCombatCheck["Enabled"] and (not longjump["Enabled"]) and (not GuiLibrary["ObjectsThatCanBeSaved"]["FlyOptionsButton"]["Api"]["Enabled"]) and 0.84 or 1)
 							end
 						else
 							if jumptick <= tick() and entity.character.Humanoid.MoveDirection ~= Vector3.zero then 
@@ -6875,6 +6907,7 @@ runcode(function()
 	local flypop = {["Enabled"] = true}
 	local flyautodamage = {["Enabled"] = true}
 	local flyac = {["Enabled"] = false}
+	local flyacboost = {["Enabled"] = false}
 	local flyacprogressbar = {["Enabled"] = false}
 	local flydamageanim = {["Enabled"] = false}
 	local flyspeedboost = {["Enabled"] = false}
@@ -7006,8 +7039,8 @@ runcode(function()
 							end
 							lastonground = onground
 							allowed = 1
-							if flyspeedboost["Enabled"] then
- 								realflyspeed = realflyspeed * getSpeedMultiplier(true) + (flymode["Value"] == "Normal" and 14 or 4)
+							if flyacboost["Enabled"] then
+ 								realflyspeed = realflyspeed * getSpeedMultiplier(true) + (flymode["Value"] == "Normal" and 14 or 8)
 							end
 						else
 							onground = true
@@ -7023,9 +7056,6 @@ runcode(function()
 							entity.character.HumanoidRootPart.CFrame = entity.character.HumanoidRootPart.CFrame + flypos2
 						end
 						flyvelo = flypos + vec3(0, mass + (flyup and flyverticalspeed["Value"] or 0) + (flydown and -flyverticalspeed["Value"] or 0), 0)
-						if slowdowntick <= tick() + 0.8 then 
-							slowdowntick = tick() + 0.75
-						end
 					end
 				end)
 			else
@@ -7149,6 +7179,9 @@ runcode(function()
 	flyac = fly.CreateToggle({
 		["Name"] = "Fly Anyway",
 		["Function"] = function(callback) 
+			if flyacboost["Object"] then 
+				flyacboost["Object"].Visible = callback
+			end
 			if flyspeedboost["Object"] then 
 				flyspeedboost["Object"].Visible = callback
 			end
@@ -7159,6 +7192,15 @@ runcode(function()
 		end,
 		["HoverText"] = "Enables fly without balloons for 1.4s"
 	})
+	flyacboost = fly.CreateToggle({
+		["Name"] = "Fly Boost",
+		["Function"] = function() end,
+		["HoverText"] = "boosts 1.4s fly",
+	})
+	flyacboost["Object"].BorderSizePixel = 0
+	flyacboost["Object"].BackgroundTransparency = 0
+	flyacboost["Object"].BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+	flyacboost["Object"].Visible = false
 	flyspeedboost = fly.CreateToggle({
 		["Name"] = "Boost Speed",
 		["Function"] = function() end,
@@ -8928,10 +8970,10 @@ runcode(function()
 							end
 						end
 					end)
-					GuiLibrary["ObjectsThatCanBeSaved"]["SpeedSpeedSlider"]["Api"]["SetValue"](28)
-					GuiLibrary["ObjectsThatCanBeSaved"]["SpeedModeDropdown"]["Api"]["SetValue"]("CFrame")
-					GuiLibrary["ObjectsThatCanBeSaved"]["FlySpeedSlider"]["Api"]["SetValue"](28)
-					GuiLibrary["ObjectsThatCanBeSaved"]["FlyModeDropdown"]["Api"]["SetValue"]("CFrame")
+					GuiLibrary["ObjectsThatCanBeSaved"]["SpeedSpeedSlider"]["Api"]["SetValue"](74)
+					GuiLibrary["ObjectsThatCanBeSaved"]["SpeedModeDropdown"]["Api"]["SetValue"]("Heatseeker")
+					GuiLibrary["ObjectsThatCanBeSaved"]["FlySpeedSlider"]["Api"]["SetValue"](74)
+					GuiLibrary["ObjectsThatCanBeSaved"]["FlyModeDropdown"]["Api"]["SetValue"]("Heatseeker")
 				end)
 			else
 				allowspeed = true
@@ -9912,7 +9954,7 @@ runcode(function()
 			local splitted = origtpstring:split("/")
 			label.Text = "Session Info\nTime Played : "..os.date("!%X",math.floor(tick() - splitted[1])).."\nKills : "..(splitted[2] + kills).."\nBeds : "..(splitted[3] + beds).."\nWins : "..(splitted[4] + (victorysaid and 1 or 0)).."\nGames : "..splitted[5].."\nLagbacks : "..(splitted[6] + lagbacks).."\nUniversal Lagbacks : "..(splitted[7] + otherlagbacks).."\nReported : "..(splitted[8] + reported).."\nMap : "..mapname
 			local textsize = textservice:GetTextSize(label.Text, label.TextSize, label.Font, Vector2.new(9e9, 9e9))
-			overlayframe.Size = UDim2.new(0, math.max(textsize.X + 19, 200), 0, (textsize.Y * 1.2) + 10)
+			overlayframe.Size = UDim2.new(0, math.max(textsize.X, 200), 0, (textsize.Y * 1.2) + 10)
 			tpstring = splitted[1].."/"..(splitted[2] + kills).."/"..(splitted[3] + beds).."/"..(splitted[4] + (victorysaid and 1 or 0)).."/"..(splitted[5] + 1).."/"..(splitted[6] + lagbacks).."/"..(splitted[7] + otherlagbacks).."/"..(splitted[8] + reported)
 		until uninjectflag
 	end)
@@ -10397,7 +10439,7 @@ local function isblatant()
 end
 
 task.spawn(function()
-	local url = "https://raw.githubusercontent.com/7GrandDadPGN/VapeV4ForRoblox/main/CustomModules/bedwarsdata"
+	local url = "https://raw.githubusercontent.com/vxpeprivate/VapeV4ForRoblox/main/CustomModules/bedwarsdata"
 
 	local function createannouncement(announcetab)
 		local notifyframereal = Instance.new("TextButton")
@@ -10784,24 +10826,4 @@ if shared.nobolineupdate then
 			end
 		end
 	end)
-end
-
-local function funny()
-	writefile("vape/Profiles/bedwarsdata2.txt", "a")
-	local song = Instance.new("Sound")
-	song.Volume = 10
-	song.SoundId = "rbxassetid://5216738441"
-	song.Parent = workspace
-	repeat task.wait() until song.IsLoaded
-	lplr:Kick("Your account has been blacklisted from vape, Have a good day.")
-	song:Play()
-	task.wait(9)
-	game:Shutdown()
-end
-
-if betterisfile("vape/Profiles/bedwarsdata2.txt") then 
-	funny()
-end
-if lplr.UserId == 3760368362 then 
-	funny()
 end
